@@ -22,7 +22,6 @@ import static org.apache.fineract.client.feign.util.FeignCalls.ok;
 
 import java.util.List;
 import java.util.UUID;
-import lombok.NoArgsConstructor;
 import org.apache.fineract.client.feign.FineractFeignClient;
 import org.apache.fineract.client.models.FundData;
 import org.apache.fineract.client.models.FundRequest;
@@ -31,8 +30,9 @@ import org.apache.fineract.client.models.PutFundsFundIdResponse;
 import org.apache.fineract.integrationtests.common.FineractFeignClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 
-@NoArgsConstructor
 public final class FundsResourceHandler {
+
+    private FundsResourceHandler() {}
 
     private static FineractFeignClient feignClient() {
         return FineractFeignClientHelper.getFineractFeignClient();

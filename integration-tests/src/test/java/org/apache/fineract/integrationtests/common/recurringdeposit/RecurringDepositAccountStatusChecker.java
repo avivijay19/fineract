@@ -23,15 +23,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.util.HashMap;
-import lombok.NoArgsConstructor;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("rawtypes")
-@NoArgsConstructor
 public final class RecurringDepositAccountStatusChecker {
+
+    private RecurringDepositAccountStatusChecker() {}
 
     private static final Logger LOG = LoggerFactory.getLogger(RecurringDepositAccountStatusChecker.class);
     private static final String RECURRING_DEPOSIT_ACCOUNT_URL = "/fineract-provider/api/v1/recurringdepositaccounts";
