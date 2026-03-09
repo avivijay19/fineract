@@ -1248,5 +1248,4 @@ public class LoanPostChargeOffScenariosTest extends BaseLoanIntegrationTest {
         return loanProductCreateResponse.getResourceId().intValue();
     }
 
-
 }

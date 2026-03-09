@@ -24,7 +24,6 @@ import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.util.HashMap;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;

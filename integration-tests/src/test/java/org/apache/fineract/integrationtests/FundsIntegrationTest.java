@@ -47,8 +47,7 @@ public class FundsIntegrationTest {
 
     @Test
     public void testCreateFund() {
-        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
-                .externalId(UUID.randomUUID().toString());
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString());
 
         PostFundsResponse response = ok(() -> fineractClient.funds().createFund(request));
         assertNotNull(response.getResourceId());
@@ -160,8 +159,7 @@ public class FundsIntegrationTest {
         String newExternalId = UUID.randomUUID().toString();
         FundRequest updateRequest = new FundRequest().name(newName).externalId(newExternalId);
 
-        PutFundsFundIdResponse updateResponse = ok(
-                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        PutFundsFundIdResponse updateResponse = ok(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
         assertNotNull(updateResponse);
 
         FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
@@ -186,11 +184,9 @@ public class FundsIntegrationTest {
         PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
         assertNotNull(createResponse.getResourceId());
 
-        FundRequest updateRequest = new FundRequest().name(Utils.randomStringGenerator("", 120))
-                .externalId(UUID.randomUUID().toString());
+        FundRequest updateRequest = new FundRequest().name(Utils.randomStringGenerator("", 120)).externalId(UUID.randomUUID().toString());
 
-        CallFailedRuntimeException exception = fail(
-                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
         assertEquals(400, exception.getStatus());
     }
 
@@ -222,8 +218,7 @@ public class FundsIntegrationTest {
         FundRequest updateRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
                 .externalId(Utils.randomStringGenerator("fund-", 120));
 
-        CallFailedRuntimeException exception = fail(
-                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
         assertEquals(400, exception.getStatus());
     }
 
