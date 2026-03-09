@@ -18,7 +18,7 @@
  */
 package org.apache.fineract.integrationtests;
 
-import static org.apache.fineract.integrationtests.common.funds.FundsResourceHandler.createFund;
+import static org.apache.fineract.integrationtests.common.funds.FundsResourceHandler.createFundWithRandomData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -119,7 +119,7 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
         loanPaymentChannelToFundSourceMappings.paymentTypeId(1L);
         paymentChannelToFundSourceMappings.add(loanPaymentChannelToFundSourceMappings);
 
-        final Integer fundId = createFund(requestSpec, responseSpec);
+        final Long fundId = createFundWithRandomData().getResourceId();
         Assertions.assertNotNull(fundId);
 
         final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
@@ -131,7 +131,7 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
                 .shortName(shortName)//
                 .description(
                         "LP1 with 12% DECLINING BALANCE interest, interest period: Daily, Interest recalculation-Daily, Compounding:none")//
-                .fundId(fundId.longValue())//
+                .fundId(fundId)//
                 .startDate(null)//
                 .closeDate(null)//
                 .includeInBorrowerCycle(false)//

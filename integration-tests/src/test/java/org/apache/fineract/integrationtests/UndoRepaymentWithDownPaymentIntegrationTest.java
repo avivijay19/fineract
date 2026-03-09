@@ -56,7 +56,6 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.integrationtests.common.accounting.AccountHelper;
 import org.apache.fineract.integrationtests.common.accounting.JournalEntryHelper;
-import org.apache.fineract.integrationtests.common.funds.FundsHelper;
 import org.apache.fineract.integrationtests.common.funds.FundsResourceHandler;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductHelper;
@@ -224,10 +223,7 @@ public class UndoRepaymentWithDownPaymentIntegrationTest extends BaseLoanIntegra
         paymentChannelToFundSourceMappings.add(loanPaymentChannelToFundSourceMappings);
 
         // fund
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
-
-        final Long fundID = createFund(jsonData, this.requestSpec, this.responseSpec);
+        final Long fundID = FundsResourceHandler.createFundWithRandomData().getResourceId();
         Assertions.assertNotNull(fundID);
 
         // Delinquency Bucket
@@ -351,13 +347,4 @@ public class UndoRepaymentWithDownPaymentIntegrationTest extends BaseLoanIntegra
         return loanId;
     }
 
-    private Long createFund(final String fundJSON, final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        String fundId = String.valueOf(FundsResourceHandler.createFund(fundJSON, requestSpec, responseSpec));
-        if (fundId.equals("null")) {
-            // Invalid JSON data parameters
-            return null;
-        }
-
-        return Long.valueOf(fundId);
-    }
 }

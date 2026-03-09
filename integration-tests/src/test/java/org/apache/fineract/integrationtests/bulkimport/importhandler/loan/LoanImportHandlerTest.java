@@ -52,7 +52,7 @@ import org.apache.fineract.integrationtests.common.OfficeHelper;
 import org.apache.fineract.integrationtests.common.PaymentTypeHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.charges.ChargesHelper;
-import org.apache.fineract.integrationtests.common.funds.FundsHelper;
+import org.apache.fineract.client.models.FundRequest;
 import org.apache.fineract.integrationtests.common.funds.FundsResourceHandler;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
@@ -160,8 +160,8 @@ public class LoanImportHandlerTest {
         JsonPath loanProductJson = JsonPath.from(loanProductStr);
 
         String fundName = Utils.uniqueRandomStringGenerator("", 9);
-        FundsHelper fh = FundsHelper.create(fundName).externalId(UUID.randomUUID().toString()).build();
-        Integer outcome_fund_creation = FundsResourceHandler.createFund(new Gson().toJson(fh), requestSpec, responseSpec);
+        FundRequest fundRequest = new FundRequest().name(fundName).externalId(UUID.randomUUID().toString());
+        Long outcome_fund_creation = FundsResourceHandler.createFund(fundRequest).getResourceId();
         Assertions.assertNotNull(outcome_fund_creation, "Could not create Fund");
 
         String paymentTypeName = PaymentTypeHelper.randomNameGenerator("P_T", 5);

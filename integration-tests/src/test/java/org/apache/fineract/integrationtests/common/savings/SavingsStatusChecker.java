@@ -23,16 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.util.HashMap;
+import lombok.NoArgsConstructor;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("rawtypes")
+@NoArgsConstructor
 public final class SavingsStatusChecker {
-
-    private SavingsStatusChecker() {
-
-    }
 
     private static final Logger LOG = LoggerFactory.getLogger(SavingsStatusChecker.class);
     private static final String SAVINGS_ACCOUNT_URL = "/fineract-provider/api/v1/savingsaccounts";
@@ -80,12 +78,20 @@ public final class SavingsStatusChecker {
         LOG.info("Savings Application Status: {} \n", savingsStatusHashMap);
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static HashMap getStatusOfSavings(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final Integer savingsID) {
         final String url = SAVINGS_ACCOUNT_URL + "/" + savingsID + "?" + Utils.TENANT_IDENTIFIER;
         return Utils.performServerGet(requestSpec, responseSpec, url, "status");
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static HashMap getSubStatusOfSavings(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final Integer savingsID) {
         final String url = SAVINGS_ACCOUNT_URL + "/" + savingsID + "?" + Utils.TENANT_IDENTIFIER;

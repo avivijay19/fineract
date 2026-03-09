@@ -18,26 +18,24 @@
  */
 package org.apache.fineract.integrationtests;
 
+import static org.apache.fineract.client.feign.util.FeignCalls.fail;
+import static org.apache.fineract.client.feign.util.FeignCalls.ok;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.hasItem;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import io.restassured.builder.RequestSpecBuilder;
-import io.restassured.builder.ResponseSpecBuilder;
-import io.restassured.http.ContentType;
-import io.restassured.specification.RequestSpecification;
-import io.restassured.specification.ResponseSpecification;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import org.apache.fineract.client.feign.FineractFeignClient;
+import org.apache.fineract.client.feign.util.CallFailedRuntimeException;
+import org.apache.fineract.client.models.FundData;
+import org.apache.fineract.client.models.FundRequest;
+import org.apache.fineract.client.models.PostFundsResponse;
+import org.apache.fineract.client.models.PutFundsFundIdResponse;
+import org.apache.fineract.integrationtests.common.FineractFeignClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
-import org.apache.fineract.integrationtests.common.funds.FundsHelper;
-import org.apache.fineract.integrationtests.common.funds.FundsResourceHandler;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,250 +43,222 @@ import org.junit.jupiter.api.Test;
  */
 public class FundsIntegrationTest {
 
-    private ResponseSpecification statusOkResponseSpec;
-    private RequestSpecification requestSpec;
-
-    @BeforeEach
-    public void setup() {
-        Utils.initializeRESTAssured();
-        this.requestSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
-        this.requestSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey());
-        this.statusOkResponseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
-    }
+    private final FineractFeignClient fineractClient = FineractFeignClientHelper.getFineractFeignClient();
 
     @Test
     public void testCreateFund() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse response = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(response.getResourceId());
     }
 
     @Test
     public void testCreateFundWithEmptyName() {
-        FundsHelper fh = FundsHelper.create(null).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest request = new FundRequest().externalId(UUID.randomUUID().toString());
 
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(400).build();
-        final Long fundID = createFund(jsonData, this.requestSpec, responseSpec);
-        Assertions.assertNull(fundID);
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().createFund(request));
+        assertEquals(400, exception.getStatus());
     }
 
     @Test
     public void testCreateFundWithEmptyExternalId() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(null).build();
-        String jsonData = fh.toJSON();
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10));
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse response = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(response.getResourceId());
     }
 
     @Test
     public void testCreateFundWithDuplicateName() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        String name = Utils.uniqueRandomStringGenerator("", 10);
+        FundRequest request = new FundRequest().name(name).externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse response = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(response.getResourceId());
 
-        FundsHelper fh2 = FundsHelper.create(fh.getName()).externalId(UUID.randomUUID().toString()).build();
-        jsonData = fh2.toJSON();
+        FundRequest duplicateRequest = new FundRequest().name(name).externalId(UUID.randomUUID().toString());
 
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(403).build();
-        final Long fundID2 = createFund(jsonData, this.requestSpec, responseSpec);
-        Assertions.assertNull(fundID2);
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().createFund(duplicateRequest));
+        assertEquals(403, exception.getStatus());
     }
 
     @Test
     public void testCreateFundWithDuplicateExternalId() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        String externalId = UUID.randomUUID().toString();
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10)).externalId(externalId);
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse response = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(response.getResourceId());
 
-        FundsHelper fh2 = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(fh.getExternalId()).build();
-        jsonData = fh2.toJSON();
+        FundRequest duplicateRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10)).externalId(externalId);
 
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(403).build();
-        final Long fundID2 = createFund(jsonData, this.requestSpec, responseSpec);
-        Assertions.assertNull(fundID2);
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().createFund(duplicateRequest));
+        assertEquals(403, exception.getStatus());
     }
 
     @Test
     public void testCreateFundWithInvalidName() {
-        FundsHelper fh = FundsHelper.create(Utils.randomStringGenerator("", 120)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest request = new FundRequest().name(Utils.randomStringGenerator("", 120)).externalId(UUID.randomUUID().toString());
 
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(400).build();
-        final Long fundID = createFund(jsonData, this.requestSpec, responseSpec);
-        Assertions.assertNull(fundID);
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().createFund(request));
+        assertEquals(400, exception.getStatus());
     }
 
     @Test
     public void testCreateFundWithInvalidExternalId() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(Utils.randomStringGenerator("fund-", 120))
-                .build();
-        String jsonData = fh.toJSON();
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(Utils.randomStringGenerator("fund-", 120));
 
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(400).build();
-        final Long fundID = createFund(jsonData, this.requestSpec, responseSpec);
-        Assertions.assertNull(fundID);
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().createFund(request));
+        assertEquals(400, exception.getStatus());
     }
 
     @Test
     public void testRetrieveFund() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        String name = Utils.uniqueRandomStringGenerator("", 10);
+        FundRequest request = new FundRequest().name(name).externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(createResponse.getResourceId());
 
-        jsonData = FundsResourceHandler.retrieveFund(fundID, this.requestSpec, this.statusOkResponseSpec);
-        FundsHelper fh2 = FundsHelper.fromJSON(jsonData);
-
-        assertEquals(fh.getName(), fh2.getName());
+        FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
+        assertEquals(name, fund.getName());
     }
 
     @Test
     public void testRetrieveAllFunds() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        String name = Utils.uniqueRandomStringGenerator("", 10);
+        FundRequest request = new FundRequest().name(name).externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(request));
+        assertNotNull(createResponse.getResourceId());
 
-        List<FundsHelper> fhList = FundsResourceHandler.retrieveAllFunds(this.requestSpec, this.statusOkResponseSpec);
+        List<FundData> funds = ok(() -> fineractClient.funds().retrieveFunds());
 
-        Assertions.assertNotNull(fhList);
-        assertThat(fhList.size(), greaterThanOrEqualTo(1));
-        assertThat(fhList, hasItem(fh));
+        Assertions.assertNotNull(funds);
+        assertThat(funds.size(), greaterThanOrEqualTo(1));
+        Assertions.assertTrue(funds.stream().anyMatch(f -> name.equals(f.getName())));
     }
 
     @Test
     public void testRetrieveUnknownFund() {
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(404).build();
-        String jsonData = FundsResourceHandler.retrieveFund(Long.MAX_VALUE, this.requestSpec, responseSpec);
-        HashMap<String, Object> map = new Gson().fromJson(jsonData, new TypeToken<HashMap<String, Object>>() {}.getType());
-        assertEquals("error.msg.resource.not.found", map.get("userMessageGlobalisationCode"));
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().retrieveFund(Long.MAX_VALUE));
+        assertEquals(404, exception.getStatus());
     }
 
     @Test
     public void testUpdateFund() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest createRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
         String newName = Utils.uniqueRandomStringGenerator("", 10);
         String newExternalId = UUID.randomUUID().toString();
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, newName, newExternalId, this.requestSpec, this.statusOkResponseSpec);
+        FundRequest updateRequest = new FundRequest().name(newName).externalId(newExternalId);
 
-        Assertions.assertEquals(newName, fh2.getName());
-        Assertions.assertEquals(newExternalId, fh2.getExternalId());
+        PutFundsFundIdResponse updateResponse = ok(
+                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        assertNotNull(updateResponse);
+
+        FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
+        assertEquals(newName, fund.getName());
+        assertEquals(newExternalId, fund.getExternalId());
     }
 
     @Test
     public void testUpdateUnknownFund() {
-        String newName = Utils.uniqueRandomStringGenerator("", 10);
-        String newExternalId = UUID.randomUUID().toString();
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(404).build();
-        FundsHelper fh = FundsResourceHandler.updateFund(Long.MAX_VALUE, newName, newExternalId, this.requestSpec, responseSpec);
-        Assertions.assertNull(fh);
+        FundRequest updateRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
+
+        CallFailedRuntimeException exception = fail(() -> fineractClient.funds().updateFund(Long.MAX_VALUE, updateRequest));
+        assertEquals(404, exception.getStatus());
     }
 
     @Test
     public void testUpdateFundWithInvalidNewName() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest createRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
-        String newName = Utils.randomStringGenerator("", 120);
-        String newExternalId = UUID.randomUUID().toString();
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(400).build();
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, newName, newExternalId, this.requestSpec, responseSpec);
+        FundRequest updateRequest = new FundRequest().name(Utils.randomStringGenerator("", 120))
+                .externalId(UUID.randomUUID().toString());
 
-        Assertions.assertNull(fh2);
+        CallFailedRuntimeException exception = fail(
+                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        assertEquals(400, exception.getStatus());
     }
 
     @Test
     public void testUpdateFundWithNewExternalId() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest createRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
         String newExternalId = UUID.randomUUID().toString();
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, null, newExternalId, this.requestSpec, this.statusOkResponseSpec);
+        FundRequest updateRequest = new FundRequest().externalId(newExternalId);
 
-        Assertions.assertEquals(newExternalId, fh2.getExternalId());
+        ok(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+
+        FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
+        assertEquals(newExternalId, fund.getExternalId());
     }
 
     @Test
     public void testUpdateFundWithInvalidNewExternalId() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest createRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
-        String newName = Utils.uniqueRandomStringGenerator("", 10);
-        String newExternalId = Utils.randomStringGenerator("fund-", 120);
-        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(400).build();
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, newName, newExternalId, this.requestSpec, responseSpec);
+        FundRequest updateRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(Utils.randomStringGenerator("fund-", 120));
 
-        Assertions.assertNull(fh2);
+        CallFailedRuntimeException exception = fail(
+                () -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+        assertEquals(400, exception.getStatus());
     }
 
     @Test
     public void testUpdateFundWithNewName() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        FundRequest createRequest = new FundRequest().name(Utils.uniqueRandomStringGenerator("", 10))
+                .externalId(UUID.randomUUID().toString());
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
         String newName = Utils.uniqueRandomStringGenerator("", 10);
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, newName, null, this.requestSpec, this.statusOkResponseSpec);
+        FundRequest updateRequest = new FundRequest().name(newName);
 
-        Assertions.assertEquals(newName, fh2.getName());
+        ok(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
+
+        FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
+        assertEquals(newName, fund.getName());
     }
 
     @Test
     public void testUpdateFundWithEmptyParams() {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        String jsonData = fh.toJSON();
+        String originalName = Utils.uniqueRandomStringGenerator("", 10);
+        String originalExternalId = UUID.randomUUID().toString();
+        FundRequest createRequest = new FundRequest().name(originalName).externalId(originalExternalId);
 
-        final Long fundID = createFund(jsonData, this.requestSpec, this.statusOkResponseSpec);
-        Assertions.assertNotNull(fundID);
+        PostFundsResponse createResponse = ok(() -> fineractClient.funds().createFund(createRequest));
+        assertNotNull(createResponse.getResourceId());
 
-        FundsHelper fh2 = FundsResourceHandler.updateFund(fundID, null, null, this.requestSpec, this.statusOkResponseSpec);
+        FundRequest updateRequest = new FundRequest();
+        ok(() -> fineractClient.funds().updateFund(createResponse.getResourceId(), updateRequest));
 
-        Assertions.assertNull(fh2.getName());
-        Assertions.assertNull(fh2.getExternalId());
-
-        // assert that there was no change in
-        // the name and external ID of the fund
-        jsonData = FundsResourceHandler.retrieveFund(fundID, this.requestSpec, this.statusOkResponseSpec);
-        FundsHelper fh3 = new Gson().fromJson(jsonData, FundsHelper.class);
-
-        Assertions.assertEquals(fh.getName(), fh3.getName());
-        Assertions.assertEquals(fh.getExternalId(), fh3.getExternalId());
+        // assert that there was no change in the name and external ID of the fund
+        FundData fund = ok(() -> fineractClient.funds().retrieveFund(createResponse.getResourceId()));
+        assertEquals(originalName, fund.getName());
+        assertEquals(originalExternalId, fund.getExternalId());
     }
-
-    private Long createFund(final String fundJSON, final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        String fundId = String.valueOf(FundsResourceHandler.createFund(fundJSON, requestSpec, responseSpec));
-        if (fundId.equals("null")) {
-            // Invalid JSON data parameters
-            return null;
-        }
-
-        return Long.valueOf(fundId);
-    }
-
 }

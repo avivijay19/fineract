@@ -18,7 +18,7 @@
  */
 package org.apache.fineract.integrationtests;
 
-import static org.apache.fineract.integrationtests.common.funds.FundsResourceHandler.createFund;
+import static org.apache.fineract.integrationtests.common.funds.FundsResourceHandler.createFundWithRandomData;
 import static org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder.ADVANCED_PAYMENT_ALLOCATION_STRATEGY;
 import static org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder.DEFAULT_STRATEGY;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1439,7 +1439,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
         loanPaymentChannelToFundSourceMappings.paymentTypeId(1L);
         paymentChannelToFundSourceMappings.add(loanPaymentChannelToFundSourceMappings);
 
-        final Integer fundId = createFund(requestSpec, responseSpec);
+        final Long fundId = createFundWithRandomData().getResourceId();
         Assertions.assertNotNull(fundId);
 
         final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
@@ -1451,7 +1451,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
                 .shortName(shortName)//
                 .description(
                         "LP1 with 12% DECLINING BALANCE interest, interest period: Daily, Interest recalculation-Daily, Compounding:none")//
-                .fundId(fundId.longValue())//
+                .fundId(fundId)//
                 .startDate(null)//
                 .closeDate(null)//
                 .includeInBorrowerCycle(false)//

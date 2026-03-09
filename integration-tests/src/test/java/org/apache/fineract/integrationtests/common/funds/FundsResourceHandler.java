@@ -18,56 +18,46 @@
  */
 package org.apache.fineract.integrationtests.common.funds;
 
-import com.google.common.reflect.TypeToken;
-import com.google.gson.Gson;
-import io.restassured.specification.RequestSpecification;
-import io.restassured.specification.ResponseSpecification;
-import java.util.HashMap;
+import static org.apache.fineract.client.feign.util.FeignCalls.ok;
+
 import java.util.List;
 import java.util.UUID;
+import lombok.NoArgsConstructor;
+import org.apache.fineract.client.feign.FineractFeignClient;
+import org.apache.fineract.client.models.FundData;
+import org.apache.fineract.client.models.FundRequest;
+import org.apache.fineract.client.models.PostFundsResponse;
+import org.apache.fineract.client.models.PutFundsFundIdResponse;
+import org.apache.fineract.integrationtests.common.FineractFeignClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 
+@NoArgsConstructor
 public final class FundsResourceHandler {
 
-    private FundsResourceHandler() {
-
+    private static FineractFeignClient feignClient() {
+        return FineractFeignClientHelper.getFineractFeignClient();
     }
 
-    private static final String FUNDS_URL = "/fineract-provider/api/v1/funds";
-    private static final String CREATE_FUNDS_URL = FUNDS_URL + "?" + Utils.TENANT_IDENTIFIER;
-
-    public static Integer createFund(final String fundJSON, final RequestSpecification requestSpec,
-            final ResponseSpecification responseSpec) {
-        return Utils.performServerPost(requestSpec, responseSpec, CREATE_FUNDS_URL, fundJSON, "resourceId");
+    public static PostFundsResponse createFund(final FundRequest request) {
+        return ok(() -> feignClient().funds().createFund(request));
     }
 
-    public static Integer createFund(final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        FundsHelper fh = FundsHelper.create(Utils.uniqueRandomStringGenerator("", 10)).externalId(UUID.randomUUID().toString()).build();
-        return createFund(fh.toJSON(), requestSpec, responseSpec);
+    public static PostFundsResponse createFundWithRandomData() {
+        FundRequest request = new FundRequest().name(Utils.uniqueRandomStringGenerator("Fund_", 10))
+                .externalId(UUID.randomUUID().toString());
+        return createFund(request);
     }
 
-    public static List<FundsHelper> retrieveAllFunds(final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        final String URL = FUNDS_URL + "?" + Utils.TENANT_IDENTIFIER;
-        List<HashMap<String, Object>> list = Utils.performServerGet(requestSpec, responseSpec, URL, "");
-        final String jsonData = new Gson().toJson(list);
-        return new Gson().fromJson(jsonData, new TypeToken<List<FundsHelper>>() {}.getType());
+    public static List<FundData> retrieveAllFunds() {
+        return ok(() -> feignClient().funds().retrieveFunds());
     }
 
-    public static String retrieveFund(final Long fundID, final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        final String URL = FUNDS_URL + "/" + fundID + "?" + Utils.TENANT_IDENTIFIER;
-        final HashMap response = Utils.performServerGet(requestSpec, responseSpec, URL, "");
-        return new Gson().toJson(response);
+    public static FundData retrieveFund(final Long fundId) {
+        return ok(() -> feignClient().funds().retrieveFund(fundId));
     }
 
-    public static FundsHelper updateFund(final Long fundID, final String newName, final String newExternalId,
-            final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
-        FundsHelper fh = FundsHelper.create(newName).externalId(newExternalId).build();
-        String updateJSON = new Gson().toJson(fh);
-
-        final String URL = FUNDS_URL + "/" + fundID + "?" + Utils.TENANT_IDENTIFIER;
-        final HashMap<String, String> response = Utils.performServerPut(requestSpec, responseSpec, URL, updateJSON, "changes");
-        final String jsonData = new Gson().toJson(response);
-        return new Gson().fromJson(jsonData, FundsHelper.class);
+    public static PutFundsFundIdResponse updateFund(final Long fundId, final FundRequest request) {
+        return ok(() -> feignClient().funds().updateFund(fundId, request));
     }
 
 }

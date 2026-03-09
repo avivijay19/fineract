@@ -23,17 +23,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.util.HashMap;
+import lombok.NoArgsConstructor;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("rawtypes")
+@NoArgsConstructor
 public final class FixedDepositAccountStatusChecker {
-
-    private FixedDepositAccountStatusChecker() {
-
-    }
 
     private static final Logger LOG = LoggerFactory.getLogger(FixedDepositAccountStatusChecker.class);
     private static final String FIXED_DEPOSIT_ACCOUNT_URL = "/fineract-provider/api/v1/fixeddepositaccounts";
@@ -80,6 +78,10 @@ public final class FixedDepositAccountStatusChecker {
         LOG.info("{}", fixedDepositStatusHashMap);
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static HashMap getStatusOfFixedDepositAccount(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final String fixedDepositAccountID) {
         final String GET_STATUS_OF_FIXED_DEPOSIT_ACCOUNT_URL = FIXED_DEPOSIT_ACCOUNT_URL + "/" + fixedDepositAccountID + "?"

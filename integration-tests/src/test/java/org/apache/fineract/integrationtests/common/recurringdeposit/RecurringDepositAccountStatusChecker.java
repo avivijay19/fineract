@@ -23,17 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.util.HashMap;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("rawtypes")
+@NoArgsConstructor
 public final class RecurringDepositAccountStatusChecker {
-
-    private RecurringDepositAccountStatusChecker() {
-
-    }
 
     private static final Logger LOG = LoggerFactory.getLogger(RecurringDepositAccountStatusChecker.class);
     private static final String RECURRING_DEPOSIT_ACCOUNT_URL = "/fineract-provider/api/v1/recurringdepositaccounts";
@@ -82,6 +81,10 @@ public final class RecurringDepositAccountStatusChecker {
         LOG.info("{}", recurringDepositStatusHashMap.toString());
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static HashMap getStatusOfRecurringDepositAccount(final RequestSpecification requestSpec,
             final ResponseSpecification responseSpec, final String recurringDepositAccountID) {
         final String GET_STATUS_OF_RECURRING_DEPOSIT_ACCOUNT_URL = RECURRING_DEPOSIT_ACCOUNT_URL + "/" + recurringDepositAccountID + "?"
