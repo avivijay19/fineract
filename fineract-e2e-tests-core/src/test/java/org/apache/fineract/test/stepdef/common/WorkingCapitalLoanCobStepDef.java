@@ -18,19 +18,36 @@
  */
 package org.apache.fineract.test.stepdef.common;
 
+import static org.apache.fineract.client.feign.util.FeignCalls.executeVoid;
+import static org.apache.fineract.client.feign.util.FeignCalls.ok;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.fineract.client.feign.FineractFeignClient;
+import org.apache.fineract.client.feign.util.CallFailedRuntimeException;
+import org.apache.fineract.client.models.BusinessDateResponse;
+import org.apache.fineract.client.models.InlineJobRequest;
+import org.apache.fineract.client.models.IsCatchUpRunningDTO;
+import org.apache.fineract.client.models.OldestCOBProcessedLoanDTO;
+import org.apache.fineract.client.models.PostClientsResponse;
+import org.apache.fineract.client.models.PostWorkingCapitalLoanProductsResponse;
 import org.apache.fineract.test.data.LoanStatus;
+import org.apache.fineract.test.helper.BusinessDateHelper;
 import org.apache.fineract.test.helper.WorkingCapitalLoanTestHelper;
+import org.apache.fineract.test.messaging.config.JobPollingProperties;
 import org.apache.fineract.test.stepdef.AbstractStepDef;
 import org.apache.fineract.test.support.TestContextKey;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +59,10 @@ public class WorkingCapitalLoanCobStepDef extends AbstractStepDef {
 
     @Autowired
     private WorkingCapitalLoanTestHelper wcLoanHelper;
+    @Autowired
+    private FineractFeignClient fineractClient;
+    @Autowired
+    private JobPollingProperties jobPollingProperties;
 
     @Before(value = "@WCCOBFeature")
     public void beforeWcCobScenario() {
@@ -66,17 +87,34 @@ public class WorkingCapitalLoanCobStepDef extends AbstractStepDef {
         }
     }
 
+    @When("Admin runs inline COB job for Working Capital Loan")
+    public void runWorkingCapitalInlineCOB() throws IOException {
+        InlineJobRequest inlineJobRequest = new InlineJobRequest().addLoanIdsItem(getTrackedLoanIds().getLast());
+        ok(() -> fineractClient.inlineJob().executeInlineJob("WC_LOAN_COB", inlineJobRequest));
+    }
+
+    @When("Admin runs inline COB job for all Working Capital Loans")
+    public void runWorkingCapitalInlineCOBForAll() throws IOException {
+        InlineJobRequest inlineJobRequest = new InlineJobRequest();
+        for (Long loanId : getTrackedLoanIds()) {
+            inlineJobRequest.addLoanIdsItem(loanId);
+        }
+        ok(() -> fineractClient.inlineJob().executeInlineJob("WC_LOAN_COB", inlineJobRequest));
+    }
+
     @Given("Admin inserts an active WC loan into the database")
     public void insertActiveWcLoan() {
-        Long loanId = wcLoanHelper.insertActiveLoan();
+        Long loanId = wcLoanHelper.insertActiveLoan(getClientId(), getProductId());
         log.debug("Inserted WC loan with id={}", loanId);
         getTrackedLoanIds().add(loanId);
     }
 
     @Given("Admin inserts {int} active WC loans into the database")
     public void insertMultipleActiveWcLoans(int count) {
+        final Long clientId = getClientId();
+        final Long productId = getProductId();
         for (int i = 0; i < count; i++) {
-            Long loanId = wcLoanHelper.insertActiveLoan();
+            Long loanId = wcLoanHelper.insertActiveLoan(clientId, productId);
             log.debug("Inserted WC loan with id={}", loanId);
             getTrackedLoanIds().add(loanId);
         }
@@ -98,19 +136,18 @@ public class WorkingCapitalLoanCobStepDef extends AbstractStepDef {
 
     @Given("Admin inserts a WC loan with status {string} into the database")
     public void insertWcLoanWithStatus(String statusName) {
-        LoanStatus status = LoanStatus.valueOf(statusName);
-        Long loanId = wcLoanHelper.insertLoan(status.getValue(), null);
-        log.debug("Inserted WC loan with id={}, status={}({})", loanId, statusName, status.getValue());
+        final LoanStatus status = LoanStatus.valueOf(statusName);
+        Long loanId = wcLoanHelper.insertLoan(status, null, getClientId(), getProductId());
+        log.debug("Inserted WC loan with id={}, status={}", loanId, statusName);
         getTrackedLoanIds().add(loanId);
     }
 
     @Given("Admin inserts a WC loan with status {string} and lastClosedBusinessDate {string} into the database")
     public void insertWcLoanWithStatusAndDate(String statusName, String dateStr) {
-        LoanStatus status = LoanStatus.valueOf(statusName);
-        LocalDate lastClosedBusinessDate = LocalDate.parse(dateStr, DATE_FORMAT);
-        Long loanId = wcLoanHelper.insertLoan(status.getValue(), lastClosedBusinessDate);
-        log.debug("Inserted WC loan with id={}, status={}({}), lastClosedBusinessDate={}", loanId, statusName, status.getValue(),
-                lastClosedBusinessDate);
+        final LoanStatus status = LoanStatus.valueOf(statusName);
+        final LocalDate lastClosedBusinessDate = LocalDate.parse(dateStr, DATE_FORMAT);
+        Long loanId = wcLoanHelper.insertLoan(status, lastClosedBusinessDate, getClientId(), getProductId());
+        log.debug("Inserted WC loan with id={}, status={}, lastClosedBusinessDate={}", loanId, statusName, lastClosedBusinessDate);
         getTrackedLoanIds().add(loanId);
     }
 
@@ -178,8 +215,59 @@ public class WorkingCapitalLoanCobStepDef extends AbstractStepDef {
                 .isNull();
     }
 
+    @When("Admin runs Working Capital COB catch up")
+    public void runWorkingCapitalLoanCOBCatchUp() {
+        try {
+            executeVoid(() -> fineractClient.workingCapitalLoanCobCatchUpApi().executeLoanCOBCatchUp1());
+        } catch (CallFailedRuntimeException e) {
+            if (e.getStatus() == 400) {
+                log.info("COB catch-up is already running (400 response), continuing with test");
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    @When("Admin checks that WC Loan COB is running until the current business date")
+    public void checkWCLoanCOBCatchUpRunningUntilCOBBusinessDate() {
+        await().atMost(Duration.ofMillis(jobPollingProperties.getTimeoutInMillis())) //
+                .pollInterval(Duration.ofMillis(jobPollingProperties.getIntervalInMillis())) //
+                .until(() -> {
+                    IsCatchUpRunningDTO isCatchUpRunningResponse = ok(
+                            () -> fineractClient.workingCapitalLoanCobCatchUpApi().isCatchUpRunning1());
+                    return isCatchUpRunningResponse.getCatchUpRunning();
+                });
+        // Then wait for catch-up to complete
+        await().atMost(Duration.ofMinutes(4)).pollInterval(Duration.ofSeconds(5)).pollDelay(Duration.ofSeconds(5)).until(() -> {
+            IsCatchUpRunningDTO statusResponse = ok(() -> fineractClient.workingCapitalLoanCobCatchUpApi().isCatchUpRunning1());
+            if (!statusResponse.getCatchUpRunning()) {
+                BusinessDateResponse businessDateResponse = ok(
+                        () -> fineractClient.businessDateManagement().getBusinessDate(BusinessDateHelper.COB, Map.of()));
+                LocalDate currentBusinessDate = businessDateResponse.getDate();
+
+                OldestCOBProcessedLoanDTO catchUpResponse = ok(
+                        () -> fineractClient.workingCapitalLoanCobCatchUpApi().getOldestCOBProcessedLoan1());
+                LocalDate lastClosedDate = catchUpResponse.getCobBusinessDate();
+
+                return !lastClosedDate.isBefore(currentBusinessDate);
+            }
+            return false;
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private List<Long> getTrackedLoanIds() {
         return testContext().get(TestContextKey.WC_LOAN_IDS);
+    }
+
+    private Long getClientId() {
+        final PostClientsResponse clientResponse = testContext().get(TestContextKey.CLIENT_CREATE_RESPONSE);
+        return clientResponse.getClientId();
+    }
+
+    private Long getProductId() {
+        final PostWorkingCapitalLoanProductsResponse workingCapitalLoanProductsResponse = testContext()
+                .get(TestContextKey.WORKING_CAPITAL_LOAN_PRODUCT_CREATE_RESPONSE);
+        return workingCapitalLoanProductsResponse.getResourceId();
     }
 }

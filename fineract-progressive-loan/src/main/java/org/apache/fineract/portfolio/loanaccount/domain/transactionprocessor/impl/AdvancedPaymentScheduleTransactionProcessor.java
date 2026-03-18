@@ -63,6 +63,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
@@ -111,6 +112,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.schedule.LoanScheduleComponent;
 import org.apache.fineract.portfolio.loanproduct.calc.EMICalculator;
+import org.apache.fineract.portfolio.loanproduct.calc.EMICalculatorDataMapper;
 import org.apache.fineract.portfolio.loanproduct.calc.data.EqualAmortizationValues;
 import org.apache.fineract.portfolio.loanproduct.calc.data.OutstandingDetails;
 import org.apache.fineract.portfolio.loanproduct.calc.data.PeriodDueDetails;
@@ -227,8 +229,9 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
         List<LoanTermVariationsData> loanTermVariations = loan.getActiveLoanTermVariations().stream().map(LoanTermVariations::toData)
                 .collect(Collectors.toCollection(ArrayList::new));
         final Integer installmentAmountInMultiplesOf = loan.getLoanProductRelatedDetail().getInstallmentAmountInMultiplesOf();
-        ProgressiveLoanInterestScheduleModel scheduleModel = emiCalculator.generateInstallmentInterestScheduleModel(installments,
-                LoanConfigurationDetailsMapper.map(loan), installmentAmountInMultiplesOf, overpaymentHolder.getMoneyObject().getMc());
+        ProgressiveLoanInterestScheduleModel scheduleModel = emiCalculator.generateInstallmentInterestScheduleModel(
+                EMICalculatorDataMapper.toRepaymentScheduleInstallmentDataList(installments), LoanConfigurationDetailsMapper.map(loan),
+                installmentAmountInMultiplesOf, overpaymentHolder.getMoneyObject().getMc());
         List<Long> loanChargeIdProcessed = new ArrayList<>();
 
         ProgressiveTransactionCtx ctx = new ProgressiveTransactionCtx(currency, installments, charges, overpaymentHolder,
@@ -406,7 +409,7 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
         final LocalDate interestRateChangeSubmittedOnDate = termVariationsData.getTermVariationApplicableFrom();
         final int repaymentPeriodsToAdd = termVariationsData.getDecimalValue().intValue();
         emiCalculator.addRepaymentPeriods(scheduleModel, interestRateChangeSubmittedOnDate, repaymentPeriodsToAdd,
-                alreadyProcessedTransactions);
+                EMICalculatorDataMapper.toProcessedTransactionDataList(alreadyProcessedTransactions));
         final Loan loan = installments.getFirst().getLoan();
 
         int nextInstallmentNumber = installments.stream().mapToInt(LoanRepaymentScheduleInstallment::getInstallmentNumber).max().orElse(0)
@@ -3261,7 +3264,14 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
                 }
             }
         } else {
-            handleReAgeWithCommonStrategy(loanTransaction, new CommonReAgeSettings(), ctx);
+            CommonReAgeSettings settings = switch (loanReAgeParameter.getInterestHandlingType()) {
+                case LoanReAgeInterestHandlingType.EQUAL_AMORTIZATION_FULL_INTEREST -> new CommonReAgeSettings(false, true, true, true);
+                case LoanReAgeInterestHandlingType.EQUAL_AMORTIZATION_PAYABLE_INTEREST -> new CommonReAgeSettings(true, true, true, true);
+                case LoanReAgeInterestHandlingType.DEFAULT -> new CommonReAgeSettings();
+                case null -> new CommonReAgeSettings();
+                default -> throw new NotImplementedException();
+            };
+            handleReAgeWithCommonStrategy(loanTransaction, settings, ctx);
         }
         if (loanTransaction.getAmount().compareTo(ZERO) == 0) {
             loanTransaction.reverse();
@@ -3706,7 +3716,7 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
         LocalDate transactionDate = loanTransaction.getTransactionDate();
 
         OutstandingDetails outstandingDetails = emiCalculator.precalculateReAgeEqualAmortizationAmount(model, transactionDate,
-                loanReAgeParameter);
+                EMICalculatorDataMapper.toLoanReAgeParameterData(loanReAgeParameter));
 
         OutstandingBalances outstandingBalances = liftOutstandingBalances(installments, transactionDate, currency,
                 settings.isSkipDownPayments(), settings.isOnlyPayableInterest(), settings.isEqualInstallmentForInterest(),
@@ -3740,7 +3750,7 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
         BalancesWithPaidInAdvance paidInAdvanceBalances = liftEarlyRepaidBalances(installments, transactionDate, currency,
                 ctx.getAlreadyProcessedTransactions());
 
-        emiCalculator.reAgeEqualAmortization(model, transactionDate, loanReAgeParameter,
+        emiCalculator.reAgeEqualAmortization(model, transactionDate, EMICalculatorDataMapper.toLoanReAgeParameterData(loanReAgeParameter),
                 outstandingBalances.fees.add(outstandingBalances.penalties), calculatedFees.add(calculatedPenalties));
 
         installments.removeIf(i -> (i.getInstallmentNumber() != null && !i.isDownPayment() && !i.getDueDate().isBefore(transactionDate)
@@ -3852,8 +3862,10 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
                         loanCharge.getAmountOutstanding(currency), numberOfReAgeInstallments, null, currency)))
                 .toList();
 
-        FirstReAgeInstallmentProps firstReAgeInstallmentProps = calculateFirstReAgeInstallmentProps(installments,
-                loanReAgeParameter.getStartDate());
+        LocalDate relativeStartDate = loanReAgeParameter.getStartDate().isBefore(transactionDate) ? loanReAgeParameter.getStartDate()
+                : transactionDate;
+
+        FirstReAgeInstallmentProps firstReAgeInstallmentProps = calculateFirstReAgeInstallmentProps(installments, relativeStartDate);
 
         BalancesWithPaidInAdvance balances = installments.stream()
                 .filter(i -> !i.isDownPayment() && !i.isAdditional() && !i.getDueDate().isBefore(transactionDate)).map(installment -> {

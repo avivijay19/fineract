@@ -90,7 +90,7 @@ public class LoanDelinquencyStepDef extends AbstractStepDef {
         Long loanId = loanResponse.getLoanId();
 
         GetLoansLoanIdResponse loanDetails = ok(() -> fineractClient.loans().retrieveLoan(loanId, Map.of("associations", "collection")));
-        Integer loanStatus = loanDetails.getStatus().getId();
+        Integer loanStatus = loanDetails.getStatus().getId() == null ? null : loanDetails.getStatus().getId().intValue();
 
         if (!LoanStatus.SUBMITTED_AND_PENDING_APPROVAL.value.equals(loanStatus) && !LoanStatus.APPROVED.value.equals(loanStatus)) {
             String delinquentDateExpectedValue = "".equals(delinquentDateExpected) ? null : delinquentDateExpected;
@@ -277,7 +277,7 @@ public class LoanDelinquencyStepDef extends AbstractStepDef {
                 .locale(DEFAULT_LOCALE);//
 
         PostLoansDelinquencyActionResponse response = ok(
-                () -> fineractClient.loans().createLoanDelinquencyAction1(loanExternalId, request));
+                () -> fineractClient.loans().createLoanDelinquencyActionByExternalId(loanExternalId, request));
         testContext().set(TestContextKey.LOAN_DELINQUENCY_ACTION_RESPONSE, response);
         eventCheckHelper.loanAccountDelinquencyPauseChangedBusinessEventCheck(loanId);
     }
@@ -295,7 +295,7 @@ public class LoanDelinquencyStepDef extends AbstractStepDef {
                 .locale(DEFAULT_LOCALE);//
 
         PostLoansDelinquencyActionResponse response = ok(
-                () -> fineractClient.loans().createLoanDelinquencyAction1(loanExternalId, request));
+                () -> fineractClient.loans().createLoanDelinquencyActionByExternalId(loanExternalId, request));
         testContext().set(TestContextKey.LOAN_DELINQUENCY_ACTION_RESPONSE, response);
         eventCheckHelper.loanAccountDelinquencyPauseChangedBusinessEventCheck(loanId);
     }

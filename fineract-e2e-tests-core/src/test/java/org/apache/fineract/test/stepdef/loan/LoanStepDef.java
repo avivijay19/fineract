@@ -1476,14 +1476,14 @@ public class LoanStepDef extends AbstractStepDef {
                 .productId(loanDetails.getLoanProductId())//
                 .principal(loanDetails.getPrincipal().longValue())//
                 .loanTermFrequency(loanDetails.getTermFrequency())//
-                .loanTermFrequencyType(loanDetails.getTermPeriodFrequencyType().getId())//
+                .loanTermFrequencyType(loanDetails.getTermPeriodFrequencyType().getId().intValue())//
                 .numberOfRepayments(loanDetails.getNumberOfRepayments())//
                 .repaymentEvery(loanDetails.getRepaymentEvery())//
-                .repaymentFrequencyType(loanDetails.getRepaymentFrequencyType().getId())//
+                .repaymentFrequencyType(loanDetails.getRepaymentFrequencyType().getId().intValue())//
                 .interestRatePerPeriod(new BigDecimal(newInterestRate))//
-                .interestType(loanDetails.getInterestType().getId())//
-                .interestCalculationPeriodType(loanDetails.getInterestCalculationPeriodType().getId())//
-                .amortizationType(loanDetails.getAmortizationType().getId())//
+                .interestType(loanDetails.getInterestType().getId().intValue())//
+                .interestCalculationPeriodType(loanDetails.getInterestCalculationPeriodType().getId().intValue())//
+                .amortizationType(loanDetails.getAmortizationType().getId().intValue())//
                 .transactionProcessingStrategyCode(loanDetails.getTransactionProcessingStrategyCode())//
                 .expectedDisbursementDate(FORMATTER.format(loanDetails.getTimeline().getExpectedDisbursementDate()))//
                 .submittedOnDate(FORMATTER.format(loanDetails.getTimeline().getSubmittedOnDate()))//
@@ -1672,7 +1672,7 @@ public class LoanStepDef extends AbstractStepDef {
         }
 
         // add new entry with expected disbursement detail
-        DisbursementDetail disbursementDetailsEntryNew = new DisbursementDetail().principal(disbursementAmount)
+        DisbursementDetail disbursementDetailsEntryNew = new DisbursementDetail().principal(BigDecimal.valueOf(disbursementAmount))
                 .expectedDisbursementDate(expectedDisbursementDate);
         disbursementData.add(disbursementDetailsEntryNew);
 
@@ -1861,6 +1861,19 @@ public class LoanStepDef extends AbstractStepDef {
                 () -> fineractClient.loans().stateTransitions(loanId, disburseRequest, Map.of("command", "disburse")));
         assertThat(exception.getStatus()).as(ErrorMessageHelper.dateFailureErrorCodeMsg()).isEqualTo(400);
         assertThat(exception.getDeveloperMessage()).contains(ErrorMessageHelper.disburseIsNotAllowedFailure());
+    }
+
+    @Then("Admin fails to disburse the loan on {string} with {string} amount due to exceed approved amount")
+    public void disburseIsNotAllowedExceedApprovedAmountFailure(String disbursementDate, String disbursementAmount) {
+        final PostLoansResponse loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        final long loanId = loanResponse.getLoanId();
+        final PostLoansLoanIdRequest disburseRequest = LoanRequestFactory.defaultLoanDisburseRequest()
+                .actualDisbursementDate(disbursementDate).transactionAmount(new BigDecimal(disbursementAmount));
+
+        final CallFailedRuntimeException exception = fail(
+                () -> fineractClient.loans().stateTransitions(loanId, disburseRequest, Map.of("command", "disburse")));
+        assertThat(exception.getStatus()).as(ErrorMessageHelper.dateFailureErrorCodeMsg()).isEqualTo(403);
+        assertThat(exception.getDeveloperMessage()).contains(ErrorMessageHelper.disburseIsNotAllowedExceedApprovedAmountFailure());
     }
 
     @Then("Admin fails to disburse the loan on {string} with {string} EUR transaction amount because of charge-off that was performed for the loan")
@@ -2615,12 +2628,13 @@ public class LoanStepDef extends AbstractStepDef {
         GetLoansLoanIdResponse loanDetailsResponse = ok(
                 () -> fineractClient.loans().retrieveLoan(loanId, Map.of("staffInSelectedOfficeOnly", "false")));
         testContext().set(TestContextKey.LOAN_RESPONSE, loanDetailsResponse);
-        Integer loanStatusActualValue = loanDetailsResponse.getStatus().getId();
+        Long loanStatusActualValue = loanDetailsResponse.getStatus().getId();
 
         LoanStatus loanStatusExpected = LoanStatus.valueOf(statusExpected);
-        Integer loanStatusExpectedValue = loanStatusExpected.getValue();
+        Long loanStatusExpectedValue = loanStatusExpected.getValue().longValue();
 
-        assertThat(loanStatusActualValue).as(ErrorMessageHelper.wrongLoanStatus(resourceId, loanStatusActualValue, loanStatusExpectedValue))
+        assertThat(loanStatusActualValue)
+                .as(ErrorMessageHelper.wrongLoanStatus(resourceId, loanStatusActualValue.intValue(), loanStatusExpectedValue.intValue()))
                 .isEqualTo(loanStatusExpectedValue);
     }
 
@@ -3264,7 +3278,7 @@ public class LoanStepDef extends AbstractStepDef {
         PostLoansResponse loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         Long loanId = loanCreateResponse.getLoanId();
         String loanExternalId = loanCreateResponse.getResourceExternalId();
-        DeleteLoansLoanIdResponse deleteLoanResponse = ok(() -> fineractClient.loans().deleteLoanApplication1(loanExternalId));
+        DeleteLoansLoanIdResponse deleteLoanResponse = ok(() -> fineractClient.loans().deleteLoanApplicationByExternalId(loanExternalId));
         assertThat(deleteLoanResponse.getLoanId()).isEqualTo(loanId);
         assertThat(deleteLoanResponse.getResourceExternalId()).isEqualTo(loanExternalId);
     }
@@ -3273,7 +3287,8 @@ public class LoanStepDef extends AbstractStepDef {
     public void failedDeleteLoanWithExternalId() {
         PostLoansResponse loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         String loanExternalId = loanCreateResponse.getResourceExternalId();
-        CallFailedRuntimeException exception = fail(() -> fineractClient.loans().deleteLoanApplication1(loanExternalId.substring(5)));
+        CallFailedRuntimeException exception = fail(
+                () -> fineractClient.loans().deleteLoanApplicationByExternalId(loanExternalId.substring(5)));
         assertThat(exception.getStatus()).as(ErrorMessageHelper.dateFailureErrorCodeMsg()).isEqualTo(404);
     }
 
@@ -3505,7 +3520,7 @@ public class LoanStepDef extends AbstractStepDef {
     @Then("Loan Product Charge-Off reasons options from loan product template have {int} options, with the following data:")
     public void loanProductTemplateChargeOffReasonOptionsCheck(final int linesExpected, final DataTable table) {
         final GetLoanProductsTemplateResponse loanProductDetails = ok(
-                () -> fineractClient.loanProducts().retrieveTemplate11(Map.of("staffInSelectedOfficeOnly", "false")));
+                () -> fineractClient.loanProducts().retrieveTemplateLoanProduct(Map.of("staffInSelectedOfficeOnly", "false")));
         assertNotNull(loanProductDetails);
         final List<GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions = loanProductDetails.getChargeOffReasonOptions();
         assertNotNull(chargeOffReasonOptions);
@@ -4408,9 +4423,10 @@ public class LoanStepDef extends AbstractStepDef {
                     actualValues.add(t.getExpectedDisbursementDate() == null ? null : FORMATTER.format(t.getExpectedDisbursementDate()));
                 case "Disbursed On" ->
                     actualValues.add(t.getActualDisbursementDate() == null ? null : FORMATTER.format(t.getActualDisbursementDate()));
-                case "Principal" -> actualValues.add(t.getPrincipal() == null ? null : String.valueOf(t.getPrincipal()));
-                case "Net Disbursal Amount" ->
-                    actualValues.add(t.getNetDisbursalAmount() == null ? null : String.valueOf(t.getNetDisbursalAmount()));
+                case "Principal" ->
+                    actualValues.add(t.getPrincipal() == null ? null : new Utils.DoubleFormatter(t.getPrincipal().doubleValue()).format());
+                case "Net Disbursal Amount" -> actualValues.add(t.getNetDisbursalAmount() == null ? null
+                        : new Utils.DoubleFormatter(t.getNetDisbursalAmount().doubleValue()).format());
                 default -> throw new IllegalStateException(String.format("Header name %s cannot be found", headerName));
             }
         }
@@ -5612,7 +5628,8 @@ public class LoanStepDef extends AbstractStepDef {
         final PutLoansAvailableDisbursementAmountRequest modifyLoanAvailableDisbursementAmountRequest = new PutLoansAvailableDisbursementAmountRequest()
                 .locale(LOCALE_EN).amount(new BigDecimal(amount));
 
-        ok(() -> fineractClient.loans().modifyLoanAvailableDisbursementAmount1(externalId, modifyLoanAvailableDisbursementAmountRequest));
+        ok(() -> fineractClient.loans().modifyLoanAvailableDisbursementAmountByExternalId(externalId,
+                modifyLoanAvailableDisbursementAmountRequest));
     }
 
     @Then("Update loan available disbursement amount is forbidden with amount {string} due to exceed applied amount")
@@ -5622,8 +5639,8 @@ public class LoanStepDef extends AbstractStepDef {
         final PutLoansAvailableDisbursementAmountRequest modifyLoanAvailableDisbursementAmountRequest = new PutLoansAvailableDisbursementAmountRequest()
                 .locale(LOCALE_EN).amount(new BigDecimal(amount));
 
-        final CallFailedRuntimeException exception = fail(() -> fineractClient.loans().modifyLoanAvailableDisbursementAmount1(externalId,
-                modifyLoanAvailableDisbursementAmountRequest));
+        final CallFailedRuntimeException exception = fail(() -> fineractClient.loans()
+                .modifyLoanAvailableDisbursementAmountByExternalId(externalId, modifyLoanAvailableDisbursementAmountRequest));
 
         assertThat(exception.getStatus()).isEqualTo(403);
         // API returns generic validation error - ideally should contain specific message about exceeding amount
@@ -5792,7 +5809,7 @@ public class LoanStepDef extends AbstractStepDef {
 
     private Long getClassificationCodeValueId(String codeName, String codeValueName) {
         // Check if code value already exists
-        List<GetCodeValuesDataResponse> existingCodeValues = fineractClient.codeValues().retrieveAllCodeValues1(codeName);
+        List<GetCodeValuesDataResponse> existingCodeValues = fineractClient.codeValues().retrieveAllCodeValuesByCodeName(codeName);
         // Try to find existing code value with the same name
         for (GetCodeValuesDataResponse codeValue : existingCodeValues) {
             if (codeValueName.equals(codeValue.getName())) {
